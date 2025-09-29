@@ -1,0 +1,11 @@
+.eb-virt
+.env
+.venv
+env/
+venv/
+eb-virt/
+
+
+
+
+C:\Users\Josh\AppData\Roaming\Python\Python312\Scripts
