@@ -1,4 +1,4 @@
-name: Django CI
+name: Django CI/CD
 
 on:
   push:
@@ -9,49 +9,67 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [ "3.11" ]
+
     steps:
-      - uses: actions/checkout@v4
+    - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: "3.11"
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
 
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install awsebcli coverage coveralls black flake8
 
-      - name: Run Django tests
-        run: |
-          python manage.py migrate
-          python manage.py test
+    - name: Run Black Check
+      run: black --check .
+
+    - name: Run Flake8
+      run: flake8 .
+
+    - name: Run Django Tests with Coverage
+      run: |
+        python manage.py migrate
+        coverage run manage.py test
+        coverage report
+        coverage html
+
+    - name: Upload Coverage to Coveralls
+      uses: coverallsapp/github-action@v2
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
 
   deploy:
     needs: build
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
     steps:
-      - uses: actions/checkout@v4
+    - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: "3.11"
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11"
 
-      - name: Install EB CLI
-        run: |
-          pip install awsebcli
+    - name: Install EB CLI
+      run: pip install awsebcli
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-2
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: us-east-2
 
-      - name: Deploy to Elastic Beanstalk
-        run: |
-          eb init "django-tutorial" --platform python-3.12 --region us-east-2
-          eb use "sweapp1-env"
-          eb deploy
+    - name: Deploy to Elastic Beanstalk
+      run: |
+        eb init "django-tutorial" --platform python-3.12 --region us-east-2
+        eb use "sweapp1-env"
+        eb deploy
